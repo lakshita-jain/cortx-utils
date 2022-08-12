@@ -21,7 +21,7 @@ import errno
 from collections import defaultdict
 from cortx.utils.conf_store import Conf
 from cortx.utils.conf_store import ConfStore
-from cortx.utils.query_framework.error import QueryDeploymentError
+from cortx.utils.query_framework.error import DeploymentConfigError
 from cortx.utils.query_framework import const
 
 class DeploymentConfig:
@@ -30,9 +30,7 @@ class DeploymentConfig:
         self._data_idx = "data_idx"
         self._local_file = "/tmp/local_conf.conf"
         self._local_conf = "yaml://" + self._local_file
-        self._data = {}
         self.topology=const.TOPOLOGY
-
 
     def get_data(self, kv_url: str):
         """Get data related to the parent key from config."""
@@ -60,29 +58,37 @@ class DeploymentConfig:
         _data = _cs.get_data(self._data_idx)
         return _data.get_data() 
     
-    
-    def get_cortx_topology(self,kv_url: str) -> dict:
-        """ get cluster toplogy """
-        
-        _data = self.get_data(kv_url)
-        if not len(_data) > 0:
-            raise QueryDeploymentError(errno.EINVAL, f"Invalid data in {kv_url}")
-        return QueryDeployment._get_cortx_topology(_data)
+class DeploymentTopology():
+    _query_conf = None
+    def __init__(self):
+        """ Static init for initialising and setting attributes."""
+        if self._query_conf is None:
+            self._query_conf = DeploymentConfig()
 
-    def _get_cortx_topology(self,data: dict) -> dict:
+    @staticmethod
+    def get_cortx_topology(kv_url: str) -> dict:
+        """ get cluster toplogy """
+        _data = {}
+        _data = DeploymentTopology._query_conf.get_data(kv_url)
+        if not len(_data) > 0:
+            raise DeploymentTopologyError(errno.EINVAL, f"Invalid data in {kv_url}")
+        return DeploymentTopology._get_cortx_topology(_data)
+    @staticmethod
+    def _get_cortx_topology(data: dict) -> dict:
         """ Map gconf fields to topology """
         nested_dict = lambda: defaultdict(nested_dict)
-        _config = self.topology
+        topology_obj = DeploymentConfig()
+        _config = topology_obj.topology
 
         # To fetch common_info
-        _config["cortx"]["common"]["release"] = self.data['cortx']['common']['release']
+        _config["cortx"]["common"]["release"] = data['cortx']['common']['release']
 
         # To fetch cluster_info
         cluster_info = nested_dict()
-        for cluster_key, cluster_val in self.data['cluster'].items():
+        for cluster_key, cluster_val in data['cluster'].items():
             storage_set_info = nested_dict()
             storage_set_list=[]
-            cluster_info['security'] = self.data['cortx']['common']['security']
+            cluster_info['security'] = data['cortx']['common']['security']
             if cluster_key == 'storage_set':
                 for storage_info in data['cluster']['storage_set']:
                     for storage_key,storage_val in storage_info.items():
@@ -105,7 +111,7 @@ class DeploymentConfig:
                 else:
                     nodes_info[key] = val
             _config["nodes"].append(json.loads(json.dumps(nodes_info)))
-        if os.path.exists(self._local_file):
-            os.remove(self._local_file)
+        if os.path.exists(DeploymentConfig._local_file):
+            os.remove(DeploymentConfig._local_file)
+        del topology_obj
         return _config
-print(Deploymentconfig.get_cortx_topology('consul://ssc-vm-g4-rhev4-1881.colo.seagate.com/conf'))
