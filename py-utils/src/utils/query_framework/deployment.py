@@ -58,7 +58,7 @@ class DeploymentConfig:
         _data = _cs.get_data(self._data_idx)
         return _data.get_data() 
     
-class DeploymentTopology():
+class DeploymentTopology:
     _query_conf = None
     def __init__(self):
         """ Static init for initialising and setting attributes."""
@@ -71,7 +71,7 @@ class DeploymentTopology():
         _data = {}
         _data = DeploymentTopology._query_conf.get_data(kv_url)
         if not len(_data) > 0:
-            raise DeploymentTopologyError(errno.EINVAL, f"Invalid data in {kv_url}")
+            raise DeploymentConfigError(errno.EINVAL, f"Invalid data in {kv_url}")
         return DeploymentTopology._get_cortx_topology(_data)
     @staticmethod
     def _get_cortx_topology(data: dict) -> dict:
